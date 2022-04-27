@@ -94,9 +94,9 @@ public:
     SensorType sensor;      // 传感器型号
     int N_SCAN;             // 扫描线数，例如16、64
     int Horizon_SCAN;       // 扫描一周计数，例如每隔0.2°扫描一次，一周360°可以扫描1800次
-    int downsampleRate;     // 扫描线降采样，跳过一些扫描线
-    float lidarMinRange;    // 最小范围
-    float lidarMaxRange;    // 最大范围
+    int downsampleRate;     // 扫描线降采样，跳过一些扫描线。程序设为了1，也就是不进行降采样
+    float lidarMinRange;    // 最小范围 1
+    float lidarMaxRange;    // 最大范围 1000
 
     // IMU参数
     float imuAccNoise;          // 加速度噪声标准差
@@ -331,15 +331,21 @@ void imuAccel2rosAccel(sensor_msgs::Imu *thisImuMsg, T *acc_x, T *acc_y, T *acc_
 }
 
 /**
- * 提取imu姿态角RPY
-*/
+ * @brief 从IMU数据中获得欧拉角
+ * 
+ * @tparam T 
+ * @param thisImuMsg ROS格式的IMU数据
+ * @param rosRoll 横滚角
+ * @param rosPitch 俯仰角
+ * @param rosYaw 偏航角
+ */
 template<typename T>
 void imuRPY2rosRPY(sensor_msgs::Imu *thisImuMsg, T *rosRoll, T *rosPitch, T *rosYaw)
 {
     double imuRoll, imuPitch, imuYaw;
     tf::Quaternion orientation;
-    tf::quaternionMsgToTF(thisImuMsg->orientation, orientation);
-    tf::Matrix3x3(orientation).getRPY(imuRoll, imuPitch, imuYaw);
+    tf::quaternionMsgToTF(thisImuMsg->orientation, orientation);///这里使用的消息类型包含了旋转姿态，即orientation
+    tf::Matrix3x3(orientation).getRPY(imuRoll, imuPitch, imuYaw);//?从旋转四元数得到欧拉角，但是采用什么顺序呢？
 
     *rosRoll = imuRoll;
     *rosPitch = imuPitch;
