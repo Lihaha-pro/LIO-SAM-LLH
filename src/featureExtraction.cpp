@@ -63,10 +63,10 @@ public:
 
     // 当前激光帧点云的曲率
     std::vector<smoothness_t> cloudSmoothness;
-    float *cloudCurvature;
+    float *cloudCurvature; //curvature就是曲率的意思
     // 特征提取标记，1表示遮挡、平行，或者已经进行特征提取的点，0表示还未进行特征提取处理
     int *cloudNeighborPicked;
-    // 1表示角点，-1表示平面点
+    // 1表示角点，-1表示平面点 0表示初始状态未处理
     int *cloudLabel;
 
     /**
@@ -74,7 +74,7 @@ public:
     */
     FeatureExtraction()
     {
-        // 订阅当前激光帧运动畸变校正后的点云信息
+        // 订阅当前激光帧运动畸变校正后的点云信息，启动回调函数 ///该点云就是从imageProjection来的
         subLaserCloudInfo = nh.subscribe<lio_sam::cloud_info>("lio_sam/deskew/cloud_info", 1, &FeatureExtraction::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
 
         // 发布当前激光帧提取特征之后的点云信息
@@ -113,11 +113,12 @@ public:
      *   2) 认为非角点的点都是平面点，加入平面点云集合，最后降采样
      * 4、发布角点、面点点云，发布带特征点云数据的当前激光帧点云信息
     */
+    ///原来跨节点传递的是点云信息类型
     void laserCloudInfoHandler(const lio_sam::cloud_infoConstPtr& msgIn)
     {
         cloudInfo = *msgIn; 
         cloudHeader = msgIn->header; 
-        // 当前激光帧运动畸变校正后的有效点云
+        // 当前激光帧运动畸变校正后的有效点云 //llh注意是有效点云，对应点云畸变校正后的extractedCloud，内存是连续的
         pcl::fromROSMsg(msgIn->cloud_deskewed, *extractedCloud); 
 
         // 计算当前激光帧点云中每个点的曲率
@@ -184,8 +185,7 @@ public:
             // 两个点在同一扫描线上，且距离相差大于0.3，认为存在遮挡关系（也就是这两个点不在同一平面上，如果在同一平面上，距离相差不会太大）
             // 远处的点会被遮挡，标记一下该点以及相邻的5个点，后面不再进行特征提取
             if (columnDiff < 10){
-                
-                if (depth1 - depth2 > 0.3){
+                if (depth1 - depth2 > 0.3){//?为什么这里要判断谁大谁小从而赋值不同的点呢？：可能是因为认为前边的墙面是可以提取特征的，从距离判断和处理逻辑上看，标记的是较远的（被遮挡）的点
                     cloudNeighborPicked[i - 5] = 1;
                     cloudNeighborPicked[i - 4] = 1;
                     cloudNeighborPicked[i - 3] = 1;
@@ -207,6 +207,8 @@ public:
             float diff2 = std::abs(float(cloudInfo.pointRange[i+1] - cloudInfo.pointRange[i]));
 
             // 平行则标记一下
+            ///平行的判断逻辑是相邻激光点距离差值不能太大，但好像没有考虑是否在同一线的问题
+            ///但从目前的情况看，如果不在同一线，结果是否置为并不确定
             if (diff1 > 0.02 * cloudInfo.pointRange[i] && diff2 > 0.02 * cloudInfo.pointRange[i])
                 cloudNeighborPicked[i] = 1;
         }
@@ -234,6 +236,7 @@ public:
             for (int j = 0; j < 6; j++)
             {
                 // 每段点云的起始、结束索引；startRingIndex为扫描线起始第5个激光点在一维数组中的索引
+                ///利用了类似线性插值的计算方法，进行每段起止索引的计算
                 int sp = (cloudInfo.startRingIndex[i] * (6 - j) + cloudInfo.endRingIndex[i] * j) / 6;
                 int ep = (cloudInfo.startRingIndex[i] * (5 - j) + cloudInfo.endRingIndex[i] * (j + 1)) / 6 - 1;
 
@@ -319,6 +322,7 @@ public:
                 }
 
                 // 平面点和未被处理的点，都认为是平面点，加入平面点云集合
+                ///除了角点，剩下没标记的点都认为是平面点
                 for (int k = sp; k <= ep; k++)
                 {
                     if (cloudLabel[k] <= 0){
@@ -330,7 +334,7 @@ public:
             // 平面点云降采样
             surfaceCloudScanDS->clear();
             downSizeFilter.setInputCloud(surfaceCloudScan);
-            downSizeFilter.filter(*surfaceCloudScanDS);
+            downSizeFilter.filter(*surfaceCloudScanDS);//体素降采样滤波，结果保存在surfaceCloudScanDS中
 
             // 加入平面点云集合
             *surfaceCloud += *surfaceCloudScanDS;

@@ -140,9 +140,9 @@ public:
     deskewFlag(0)
     {
         // 订阅原始imu数据
-        subImu        = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());//进入回调函数imuHandler()
+        subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());//进入回调函数imuHandler()
         // 订阅imu里程计，由imuPreintegration积分计算得到的每时刻imu位姿
-        subOdom       = nh.subscribe<nav_msgs::Odometry>(odomTopic+"_incremental", 2000, &ImageProjection::odometryHandler, this, ros::TransportHints().tcpNoDelay());
+        subOdom = nh.subscribe<nav_msgs::Odometry>(odomTopic+"_incremental", 2000, &ImageProjection::odometryHandler, this, ros::TransportHints().tcpNoDelay());
         // 订阅原始lidar数据
         subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(pointCloudTopic, 5, &ImageProjection::cloudHandler, this, ros::TransportHints().tcpNoDelay());
 
@@ -188,7 +188,7 @@ public:
     {
         laserCloudIn->clear();
         extractedCloud->clear();
-        //?点云距离初始化为无穷大
+        //点云距离初始化为无穷大
         rangeMat = cv::Mat(N_SCAN, Horizon_SCAN, CV_32F, cv::Scalar::all(FLT_MAX));
 
         imuPointerCur = 0;
@@ -428,7 +428,7 @@ public:
      * @brief 当前帧对应imu数据处理
      * 1、遍历当前激光帧起止时刻之间的imu数据，初始时刻对应imu的姿态角RPY设为当前帧的初始姿态角
      * 2、用角速度、时间积分，计算每一时刻相对于初始时刻的旋转量，初始时刻旋转设为0
-     * 注：imu数据都已经转换到lidar系下了//?这句话什么意思，计算的不是以第一帧IMU帧初始的位姿吗
+     * 注：imu数据都已经转换到lidar系下了//?这句话什么意思，计算的不是以第一帧IMU帧初始的位姿吗？：已经在前边校正到lidar系了imuConverter()
      * @result 计算结果保存在imuRotX中，点数保存在imuPointerCur
      */
     void imuDeskewInfo()
@@ -734,7 +734,7 @@ public:
             float horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
 
             // 水平扫描角度步长，例如一周扫描1800次，则两次扫描间隔角度0.2°
-            static float ang_res_x = 360.0/float(Horizon_SCAN);
+            static float ang_res_x = 360.0/float(Horizon_SCAN);//Horizon_SCAN = 1800
             int columnIdn = -round((horizonAngle-90.0)/ang_res_x) + Horizon_SCAN/2;
             if (columnIdn >= Horizon_SCAN)
                 columnIdn -= Horizon_SCAN;
@@ -777,9 +777,9 @@ public:
                 // 有效激光点
                 if (rangeMat.at<float>(i,j) != FLT_MAX)
                 {
-                    // 记录激光点对应的Horizon_SCAN方向上的索引
+                    // 记录激光点对应的Horizon_SCAN方向上的索引 后面用于判断激光点是否是同一线中的
                     cloudInfo.pointColInd[count] = j;
-                    // 激光点距离
+                    // 激光点距离 后边用这个计算曲率
                     cloudInfo.pointRange[count] = rangeMat.at<float>(i,j);
                     // 加入有效激光点
                     extractedCloud->push_back(fullCloud->points[j + i*Horizon_SCAN]);

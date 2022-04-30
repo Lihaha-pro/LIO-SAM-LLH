@@ -111,18 +111,18 @@ public:
     Eigen::Matrix3d extRot;     // xyz坐标系旋转
     Eigen::Matrix3d extRPY;     // RPY欧拉角的变换关系
     Eigen::Vector3d extTrans;   // xyz坐标系平移
-    Eigen::Quaterniond extQRPY;
+    Eigen::Quaterniond extQRPY; //将RPY转换为四元数
 
     // LOAM
-    float edgeThreshold;
-    float surfThreshold;
+    float edgeThreshold; //1.0
+    float surfThreshold; //0.1
     int edgeFeatureMinValidNum;
     int surfFeatureMinValidNum;
 
     // voxel filter paprams
-    float odometrySurfLeafSize;
-    float mappingCornerLeafSize;
-    float mappingSurfLeafSize ;
+    float odometrySurfLeafSize;//0.2
+    float mappingCornerLeafSize;//0.2
+    float mappingSurfLeafSize ;//0.2
 
     float z_tollerance; 
     float rotation_tollerance;
@@ -248,8 +248,11 @@ public:
     }
 
     /**
-     * imu原始测量数据转换到lidar系，加速度、角速度、RPY
-    */
+     * @brief imu原始测量数据转换到lidar系，加速度、角速度、RPY
+     * 
+     * @param imu_in 原始IMU消息
+     * @return sensor_msgs::Imu 转换到Lidar系下的IMU消息
+     */
     sensor_msgs::Imu imuConverter(const sensor_msgs::Imu& imu_in)
     {
         sensor_msgs::Imu imu_out = imu_in;
@@ -266,8 +269,9 @@ public:
         imu_out.angular_velocity.y = gyr.y();
         imu_out.angular_velocity.z = gyr.z();
         // RPY
+        //? ///用加速度计和磁力计可以计算得到方位角，也就是欧拉角，这个有待进一步研究奥
         Eigen::Quaterniond q_from(imu_in.orientation.w, imu_in.orientation.x, imu_in.orientation.y, imu_in.orientation.z);
-        // 为什么是右乘，可以动手画一下看看
+        // 为什么是右乘，可以动手画一下看看//?为啥是右乘？
         Eigen::Quaterniond q_final = q_from * extQRPY;
         imu_out.orientation.x = q_final.x();
         imu_out.orientation.y = q_final.y();
